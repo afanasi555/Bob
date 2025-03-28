@@ -17,12 +17,25 @@ async function loadPyodideAndPackages() {
         `);
         document.getElementById('progressText').textContent = 'Прогресс: 20% - Pyodide готов';
         pyodideReady = true;
+        localStorage.setItem('pyodideLoaded', 'true'); // Сохраняем состояние
     }
 }
 
-// Загружаем Pyodide при загрузке страницы
+// Проверяем кэш и загружаем Pyodide при старте
 window.addEventListener('load', async () => {
-    await loadPyodideAndPackages();
+    if (localStorage.getItem('pyodideLoaded') === 'true' && 'caches' in window) {
+        document.getElementById('progressText').textContent = 'Прогресс: 0% - Проверка кэша';
+        const cache = await caches.open('audio-mini-app-cache-v1');
+        const cachedPyodide = await cache.match('https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js');
+        if (cachedPyodide) {
+            document.getElementById('progressText').textContent = 'Прогресс: 20% - Использование кэша';
+            pyodideReady = true;
+        } else {
+            await loadPyodideAndPackages();
+        }
+    } else {
+        await loadPyodideAndPackages();
+    }
 });
 
 function syncSlidersAndInputs(sliderId, inputId) {
