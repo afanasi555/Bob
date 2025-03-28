@@ -1,4 +1,7 @@
-// Общие переменные
+// URL сервера на Glitch
+const SERVER_URL = 'https://carnelian-hungry-silver.glitch.me/';
+
+// Глобальные переменные
 let vocalBlob, instrBlob, mixBlob, convertedBlob, editedBlob;
 let editedVocalBlob = null;
 
@@ -11,16 +14,21 @@ function syncSlidersAndInputs(sliderId, inputId) {
 }
 
 // Разделение аудио
-if (document.getElementById('audioInput')) {
-    document.getElementById('audioInput').addEventListener('change', function(e) {
+if (document.getElementById('audioInput') && !document.getElementById('speedSlider')) {
+    document.getElementById('audioInput').addEventListener('change', async function(e) {
         const file = e.target.files[0];
         if (file) {
-            // Эмуляция разделения (замените на реальную обработку)
-            const audioUrl = URL.createObjectURL(file);
-            vocalBlob = file; // Здесь должна быть реальная обработка
-            instrBlob = file; // Здесь должна быть реальная обработка
-            document.getElementById('vocalPreview').src = audioUrl;
-            document.getElementById('instrPreview').src = audioUrl;
+            const formData = new FormData();
+            formData.append('audio', file);
+            const response = await fetch(`${SERVER_URL}/separate`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            vocalBlob = await fetch(data.vocal).then(res => res.blob());
+            instrBlob = await fetch(data.instrumental).then(res => res.blob());
+            document.getElementById('vocalPreview').src = URL.createObjectURL(vocalBlob);
+            document.getElementById('instrPreview').src = URL.createObjectURL(instrBlob);
             document.getElementById('result').style.display = 'block';
         }
     });
@@ -73,20 +81,26 @@ if (document.getElementById('audioInput1')) {
     if (localStorage.getItem('vocalToMix')) {
         input1.disabled = true;
         input2.disabled = true;
-        mixBlob = new Blob([vocalBlob, instrBlob]); // Эмуляция
-        document.getElementById('mixPreview').src = URL.createObjectURL(mixBlob);
-        document.getElementById('result').style.display = 'block';
+        updateMix(vocalBlob, instrBlob);
         localStorage.removeItem('vocalToMix');
         localStorage.removeItem('instrToMix');
     }
 
-    input1.addEventListener('change', updateMix);
-    input2.addEventListener('change', updateMix);
-    balance.addEventListener('input', updateMix);
+    input1.addEventListener('change', () => updateMix(input1.files[0], input2.files[0]));
+    input2.addEventListener('change', () => updateMix(input1.files[0], input2.files[0]));
+    balance.addEventListener('input', () => updateMix(input1.files[0], input2.files[0]));
 
-    function updateMix() {
-        if (input1.files[0] && input2.files[0]) {
-            mixBlob = new Blob([input1.files[0], input2.files[0]]); // Эмуляция
+    async function updateMix(file1, file2) {
+        if (file1 && file2) {
+            const formData = new FormData();
+            formData.append('audio1', file1);
+            formData.append('audio2', file2);
+            formData.append('balance', balance.value);
+            const response = await fetch(`${SERVER_URL}/mix`, {
+                method: 'POST',
+                body: formData
+            });
+            mixBlob = await response.blob();
             document.getElementById('mixPreview').src = URL.createObjectURL(mixBlob);
             document.getElementById('result').style.display = 'block';
         }
@@ -120,11 +134,18 @@ function downloadMix() {
 
 // Конвертация аудио
 if (document.getElementById('formatSelect')) {
-    document.getElementById('audioInput').addEventListener('change', function(e) {
+    document.getElementById('audioInput').addEventListener('change', async function(e) {
         const file = e.target.files[0];
         const format = document.getElementById('formatSelect').value;
         if (file) {
-            convertedBlob = file; // Эмуляция
+            const formData = new FormData();
+            formData.append('audio', file);
+            formData.append('format', format);
+            const response = await fetch(`${SERVER_URL}/convert`, {
+                method: 'POST',
+                body: formData
+            });
+            convertedBlob = await response.blob();
             document.getElementById('convertedPreview').src = URL.createObjectURL(convertedBlob);
             document.getElementById('result').style.display = 'block';
         }
@@ -154,19 +175,32 @@ if (document.getElementById('speedSlider')) {
     const input = document.getElementById('audioInput');
     if (localStorage.getItem('vocalToEdit')) {
         input.disabled = true;
-        editedBlob = new Blob([vocalBlob]); // Эмуляция
-        document.getElementById('editedPreview').src = localStorage.getItem('vocalToEdit');
-        document.getElementById('result').style.display = 'block';
+        document.getElementById('saveVocalBtn').style.display = 'inline-block';
+        updateEdit(localStorage.getItem('vocalToEdit'));
         localStorage.removeItem('vocalToEdit');
-        document.getElementById('result').innerHTML += '<button onclick="saveEditedVocal()">Сохранить вокал</button>';
     }
 
-    input.addEventListener('change', updateEdit);
-    document.querySelectorAll('.slider, .small-input').forEach(el => el.addEventListener('input', updateEdit));
+    input.addEventListener('change', () => updateEdit(input.files[0]));
+    document.querySelectorAll('.slider, .small-input').forEach(el => el.addEventListener('input', () => {
+        if (input.files[0]) updateEdit(input.files[0]);
+    }));
 
-    function updateEdit() {
-        if (input.files[0]) {
-            editedBlob = input.files[0]; // Эмуляция моментальной обработки
+    async function updateEdit(fileOrUrl) {
+        const file = typeof fileOrUrl === 'string' ? await fetch(fileOrUrl).then(res => res.blob()) : fileOrUrl;
+        if (file) {
+            const formData = new FormData();
+            formData.append('audio', file);
+            formData.append('speed', document.getElementById('speedInput').value);
+            formData.append('pitch', document.getElementById('pitchInput').value);
+            formData.append('echo', document.getElementById('echoInput').value);
+            formData.append('reverb', document.getElementById('reverbInput').value);
+            formData.append('flanger', document.getElementById('flangerInput').value);
+            formData.append('volume', document.getElementById('volumeInput').value);
+            const response = await fetch(`${SERVER_URL}/edit`, {
+                method: 'POST',
+                body: formData
+            });
+            editedBlob = await response.blob();
             document.getElementById('editedPreview').src = URL.createObjectURL(editedBlob);
             document.getElementById('result').style.display = 'block';
         }
