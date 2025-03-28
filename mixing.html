@@ -11,15 +11,16 @@
         <h1>Смешивание аудио</h1>
         <input type="file" id="audioInput1" accept="audio/*" class="file-input">
         <input type="file" id="audioInput2" accept="audio/*" class="file-input">
-        <label>Баланс (первый файл - второй файл):</label>
+        <label>Баланс (первый - второй):</label>
         <input type="range" id="mixBalance" min="-100" max="100" value="0" class="slider">
         <div id="result" class="result">
             <audio id="mixPreview" controls></audio>
-            <button onclick="playMixPreview()">Проиграть</button>
-            <button onclick="downloadMix()">Скачать</button>
+            <button onclick="playMixPreview()" class="btn-play btn-small btn-purple">Проиграть</button>
+            <button onclick="downloadMix()" class="btn-download btn-green">Скачать</button>
         </div>
         <a href="index.html" class="back-button">Назад</a>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
