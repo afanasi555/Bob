@@ -5,19 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Конвертация аудио</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>Конвертация аудио</h1>
         <input type="file" id="audioInput" accept="audio/*" class="file-input">
-        <select id="formatSelect" class="select">
+        <label>Исходный формат:</label>
+        <select id="sourceFormat" class="select">
+            <option value="mp3">MP3</option>
+            <option value="wav">WAV</option>
+            <option value="ogg">OGG</option>
+            <option value="flac">FLAC</option>
+        </select>
+        <label>Целевой формат:</label>
+        <select id="targetFormat" class="select">
             <option value="mp3">MP3</option>
             <option value="wav">WAV</option>
             <option value="ogg">OGG</option>
             <option value="flac">FLAC</option>
         </select>
         <button id="processButton" class="button btn-green" disabled>Начать обработку</button>
-        <progress id="progressBar" value="0" max="100" class="progress-bar"></progress>
+        <div id="progressText" class="progress-text">Прогресс: 0%</div>
         <div id="result" class="result">
             <audio id="convertedPreview" controls></audio>
             <button onclick="playConvertedPreview()" class="btn-play btn-small btn-green">Проиграть</button>
