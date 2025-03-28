@@ -10,6 +10,8 @@
     <div class="container">
         <h1>Разделение аудио</h1>
         <input type="file" id="audioInput" accept="audio/*" class="file-input">
+        <button id="processButton" class="button btn-blue" disabled>Начать обработку</button>
+        <progress id="progressBar" value="0" max="100" class="progress-bar"></progress>
         <div id="result" class="result">
             <div class="audio-section">
                 <h3>Вокал</h3>
