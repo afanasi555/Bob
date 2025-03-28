@@ -13,6 +13,8 @@
         <input type="file" id="audioInput2" accept="audio/*" class="file-input">
         <label>Баланс (первый - второй):</label>
         <input type="range" id="mixBalance" min="-100" max="100" value="0" class="slider">
+        <button id="processButton" class="button btn-purple" disabled>Начать обработку</button>
+        <progress id="progressBar" value="0" max="100" class="progress-bar"></progress>
         <div id="result" class="result">
             <audio id="mixPreview" controls></audio>
             <button onclick="playMixPreview()" class="btn-play btn-small btn-purple">Проиграть</button>
