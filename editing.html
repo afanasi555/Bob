@@ -26,8 +26,9 @@
         </div>
         <div id="result" class="result">
             <audio id="editedPreview" controls></audio>
-            <button onclick="playEditedPreview()">Проиграть</button>
-            <button onclick="downloadEdited()">Скачать</button>
+            <button onclick="playEditedPreview()" class="btn-play btn-small btn-orange">Проиграть</button>
+            <button onclick="downloadEdited()" class="btn-download btn-blue">Скачать</button>
+            <button id="saveVocalBtn" onclick="saveEditedVocal()" class="btn-green" style="display: none;">Сохранить вокал</button>
         </div>
         <a href="index.html" class="back-button">Назад</a>
     </div>
