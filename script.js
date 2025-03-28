@@ -1,20 +1,29 @@
 let pyodide;
 let vocalBlob, instrBlob, mixBlob, convertedBlob, editedBlob;
 let editedVocalBlob = null;
+let pyodideReady = false;
 
 async function loadPyodideAndPackages() {
-    document.getElementById('progressText').textContent = 'Прогресс: 0% - Загрузка Pyodide';
-    pyodide = await loadPyodide();
-    document.getElementById('progressText').textContent = 'Прогресс: 10% - Установка библиотек';
-    await pyodide.loadPackage(['numpy', 'scipy', 'micropip']);
-    await pyodide.runPythonAsync(`
-        import micropip
-        await micropip.install('pydub')
-        await micropip.install('soundfile')
-        await micropip.install('ffmpeg-python')
-    `);
-    document.getElementById('progressText').textContent = 'Прогресс: 20% - Pyodide готов';
+    if (!pyodideReady) {
+        document.getElementById('progressText').textContent = 'Прогресс: 0% - Загрузка Pyodide';
+        pyodide = await loadPyodide();
+        document.getElementById('progressText').textContent = 'Прогресс: 10% - Установка библиотек';
+        await pyodide.loadPackage(['numpy', 'scipy', 'micropip']);
+        await pyodide.runPythonAsync(`
+            import micropip
+            await micropip.install('pydub')
+            await micropip.install('soundfile')
+            await micropip.install('ffmpeg-python')
+        `);
+        document.getElementById('progressText').textContent = 'Прогресс: 20% - Pyodide готов';
+        pyodideReady = true;
+    }
 }
+
+// Загружаем Pyodide при загрузке страницы
+window.addEventListener('load', async () => {
+    await loadPyodideAndPackages();
+});
 
 function syncSlidersAndInputs(sliderId, inputId) {
     const slider = document.getElementById(sliderId);
@@ -26,22 +35,21 @@ function syncSlidersAndInputs(sliderId, inputId) {
 function enableProcessButton() {
     const processButton = document.getElementById('processButton');
     if (document.getElementById('audioInput') && document.getElementById('audioInput').files.length > 0) {
-        processButton.disabled = false;
+        processButton.disabled = !pyodideReady;
     } else if (document.getElementById('audioInput1') && document.getElementById('audioInput1').files.length > 0 && 
                document.getElementById('audioInput2') && document.getElementById('audioInput2').files.length > 0) {
-        processButton.disabled = false;
+        processButton.disabled = !pyodideReady;
     } else {
         processButton.disabled = true;
     }
 }
 
-// Разделение аудио (MP3 и улучшенное разделение)
+// Разделение аудио
 if (document.getElementById('audioInput') && !document.getElementById('speedSlider')) {
     document.getElementById('audioInput').addEventListener('change', enableProcessButton);
     document.getElementById('processButton').addEventListener('click', async () => {
         const file = document.getElementById('audioInput').files[0];
-        if (file) {
-            await loadPyodideAndPackages();
+        if (file && pyodideReady) {
             document.getElementById('progressText').textContent = 'Прогресс: 30% - Чтение файла';
             const arrayBuffer = await file.arrayBuffer();
             const fileExt = file.name.split('.').pop().toLowerCase();
@@ -59,18 +67,15 @@ if (document.getElementById('audioInput') && !document.getElementById('speedSlid
                 from scipy import signal
                 from scipy.fft import fft, ifft
 
-                # Чтение аудио
                 y, sr = sf.read('input.wav')
                 if y.ndim > 1:
                     y = np.mean(y, axis=1)
 
-                # Спектральный анализ
                 n = len(y)
                 freq = fft(y)
                 freq_magnitude = np.abs(freq)
                 freq_phase = np.angle(freq)
 
-                # Фильтрация вокала (500 Гц - 4000 Гц) и инструментала
                 freq_vocal = freq.copy()
                 freq_instr = freq.copy()
                 cutoff_low = 500 * n // sr
@@ -81,15 +86,12 @@ if (document.getElementById('audioInput') && !document.getElementById('speedSlid
                 freq_instr[cutoff_low:cutoff_high] = 0
                 freq_instr[n-cutoff_high:n-cutoff_low] = 0
 
-                # Обратное преобразование
                 vocal = np.real(ifft(freq_vocal))
                 instr = np.real(ifft(freq_instr))
 
-                # Нормализация
                 vocal = vocal / np.max(np.abs(vocal)) * 0.9
                 instr = instr / np.max(np.abs(instr)) * 0.9
 
-                # Сохранение
                 sf.write('vocal.wav', vocal, sr)
                 sf.write('instr.wav', instr, sr)
             `);
@@ -149,7 +151,7 @@ if (document.getElementById('audioInput1')) {
     if (localStorage.getItem('vocalToMix')) {
         input1.disabled = true;
         input2.disabled = true;
-        document.getElementById('processButton').disabled = false;
+        document.getElementById('processButton').disabled = !pyodideReady;
     }
 
     document.getElementById('processButton').addEventListener('click', async () => {
@@ -159,8 +161,7 @@ if (document.getElementById('audioInput1')) {
             file1 = await fetch(localStorage.getItem('vocalToMix')).then(res => res.blob());
             file2 = await fetch(localStorage.getItem('instrToMix')).then(res => res.blob());
         }
-        if (file1 && file2) {
-            await loadPyodideAndPackages();
+        if (file1 && file2 && pyodideReady) {
             document.getElementById('progressText').textContent = 'Прогресс: 30% - Чтение файлов';
             const arrayBuffer1 = await file1.arrayBuffer();
             const arrayBuffer2 = await file2.arrayBuffer();
@@ -188,7 +189,7 @@ if (document.getElementById('audioInput1')) {
                 mixed = audio1.overlay(audio2)
                 mixed.export('mixed.wav', format='wav')
             `);
-            document.getElementById('progressText').textContent = 'П References: 100% - Готово';
+            document.getElementById('progressText').textContent = 'Прогресс: 100% - Готово';
             mixBlob = new Blob([pyodide.FS.readFile('mixed.wav')], { type: 'audio/wav' });
             document.getElementById('mixPreview').src = URL.createObjectURL(mixBlob);
             document.getElementById('result').style.display = 'block';
@@ -232,8 +233,7 @@ if (document.getElementById('sourceFormat')) {
         const file = document.getElementById('audioInput').files[0];
         const sourceFormat = document.getElementById('sourceFormat').value;
         const targetFormat = document.getElementById('targetFormat').value;
-        if (file) {
-            await loadPyodideAndPackages();
+        if (file && pyodideReady) {
             document.getElementById('progressText').textContent = 'Прогресс: 30% - Чтение файла';
             const arrayBuffer = await file.arrayBuffer();
             pyodide.FS.writeFile(`input.${sourceFormat}`, new Uint8Array(arrayBuffer));
@@ -275,14 +275,13 @@ if (document.getElementById('speedSlider')) {
     if (localStorage.getItem('vocalToEdit')) {
         input.disabled = true;
         document.getElementById('saveVocalBtn').style.display = 'inline-block';
-        document.getElementById('processButton').disabled = false;
+        document.getElementById('processButton').disabled = !pyodideReady;
     }
 
     input.addEventListener('change', enableProcessButton);
     document.getElementById('processButton').addEventListener('click', async () => {
         const file = localStorage.getItem('vocalToEdit') ? await fetch(localStorage.getItem('vocalToEdit')).then(res => res.blob()) : input.files[0];
-        if (file) {
-            await loadPyodideAndPackages();
+        if (file && pyodideReady) {
             document.getElementById('progressText').textContent = 'Прогресс: 30% - Чтение файла';
             const arrayBuffer = await file.arrayBuffer();
             const fileExt = file.name.split('.').pop().toLowerCase();
