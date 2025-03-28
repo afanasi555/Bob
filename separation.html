@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Разделение аудио</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Разделение аудио</h1>
+        <input type="file" id="audioInput" accept="audio/*" class="file-input">
+        <div id="result" class="result">
+            <h3>Результат:</h3>
+            <audio id="vocalPreview" controls></audio>
+            <audio id="instrPreview" controls></audio>
+            <button onclick="editVocal()">Изменить вокал</button>
+            <button onclick="mixResults()">Смешать</button>
+            <button onclick="playPreview('vocal')">Проиграть вокал</button>
+            <button onclick="playPreview('instr')">Проиграть инструментал</button>
+            <button onclick="downloadResults()">Скачать</button>
+        </div>
+        <a href="index.html" class="back-button">Назад</a>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
