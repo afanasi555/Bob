@@ -16,10 +16,12 @@
             <option value="ogg">OGG</option>
             <option value="flac">FLAC</option>
         </select>
+        <button id="processButton" class="button btn-green" disabled>Начать обработку</button>
+        <progress id="progressBar" value="0" max="100" class="progress-bar"></progress>
         <div id="result" class="result">
             <audio id="convertedPreview" controls></audio>
-            <button onclick="playConvertedPreview()">Проиграть</button>
-            <button onclick="downloadConverted()">Скачать</button>
+            <button onclick="playConvertedPreview()" class="btn-play btn-small btn-green">Проиграть</button>
+            <button onclick="downloadConverted()" class="btn-download btn-blue">Скачать</button>
         </div>
         <a href="index.html" class="back-button">Назад</a>
     </div>
