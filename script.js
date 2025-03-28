@@ -1,11 +1,8 @@
-// URL сервера на Glitch
 const SERVER_URL = 'https://d699b6f2-1143-4e86-a434-0a3d0803b2af-00-bln4qkwkaxad.kirk.replit.dev';
 
-// Глобальные переменные
 let vocalBlob, instrBlob, mixBlob, convertedBlob, editedBlob;
 let editedVocalBlob = null;
 
-// Синхронизация ползунков и полей ввода
 function syncSlidersAndInputs(sliderId, inputId) {
     const slider = document.getElementById(sliderId);
     const input = document.getElementById(inputId);
@@ -13,47 +10,66 @@ function syncSlidersAndInputs(sliderId, inputId) {
     input.oninput = () => slider.value = input.value;
 }
 
+function enableProcessButton() {
+    const processButton = document.getElementById('processButton');
+    if (document.getElementById('audioInput') && document.getElementById('audioInput').files.length > 0) {
+        processButton.disabled = false;
+    } else if (document.getElementById('audioInput1') && document.getElementById('audioInput1').files.length > 0 && 
+               document.getElementById('audioInput2') && document.getElementById('audioInput2').files.length > 0) {
+        processButton.disabled = false;
+    } else {
+        processButton.disabled = true;
+    }
+}
+
+function showProgress(progress) {
+    const progressBar = document.getElementById('progressBar');
+    progressBar.style.display = 'block';
+    progressBar.value = progress;
+}
+
 // Разделение аудио
 if (document.getElementById('audioInput') && !document.getElementById('speedSlider')) {
-    document.getElementById('audioInput').addEventListener('change', async function(e) {
-        const file = e.target.files[0];
+    document.getElementById('audioInput').addEventListener('change', enableProcessButton);
+    document.getElementById('processButton').addEventListener('click', async () => {
+        const file = document.getElementById('audioInput').files[0];
         if (file) {
             const formData = new FormData();
             formData.append('audio', file);
+            showProgress(10);
             const response = await fetch(`${SERVER_URL}/separate`, {
                 method: 'POST',
                 body: formData
             });
+            showProgress(50);
             const data = await response.json();
             vocalBlob = await fetch(data.vocal).then(res => res.blob());
             instrBlob = await fetch(data.instrumental).then(res => res.blob());
+            showProgress(100);
             document.getElementById('vocalPreview').src = URL.createObjectURL(vocalBlob);
             document.getElementById('instrPreview').src = URL.createObjectURL(instrBlob);
             document.getElementById('result').style.display = 'block';
+            setTimeout(() => document.getElementById('progressBar').style.display = 'none', 500);
         }
     });
 }
 
-// Изменение вокала
 function editVocal() {
     localStorage.setItem('vocalToEdit', URL.createObjectURL(vocalBlob));
     window.location.href = 'editing.html?vocal=true';
 }
 
-// Смешивание результатов
 function mixResults() {
     localStorage.setItem('vocalToMix', URL.createObjectURL(vocalBlob));
     localStorage.setItem('instrToMix', URL.createObjectURL(instrBlob));
     window.location.href = 'mixing.html?fromSeparation=true';
 }
 
-// Воспроизведение превью
 function playPreview(type) {
     const audio = document.getElementById(type === 'vocal' ? 'vocalPreview' : 'instrPreview');
     audio.play();
 }
 
-// Скачивание результатов
 function downloadResults() {
     const includeOriginal = confirm('Включить оригинальный вокал в скачивание?');
     const zip = new JSZip();
@@ -78,33 +94,44 @@ if (document.getElementById('audioInput1')) {
     const input2 = document.getElementById('audioInput2');
     const balance = document.getElementById('mixBalance');
 
+    input1.addEventListener('change', enableProcessButton);
+    input2.addEventListener('change', enableProcessButton);
+
     if (localStorage.getItem('vocalToMix')) {
         input1.disabled = true;
         input2.disabled = true;
-        updateMix(vocalBlob, instrBlob);
-        localStorage.removeItem('vocalToMix');
-        localStorage.removeItem('instrToMix');
+        document.getElementById('processButton').disabled = false;
     }
 
-    input1.addEventListener('change', () => updateMix(input1.files[0], input2.files[0]));
-    input2.addEventListener('change', () => updateMix(input1.files[0], input2.files[0]));
-    balance.addEventListener('input', () => updateMix(input1.files[0], input2.files[0]));
-
-    async function updateMix(file1, file2) {
+    document.getElementById('processButton').addEventListener('click', async () => {
+        let file1 = input1.files[0];
+        let file2 = input2.files[0];
+        if (localStorage.getItem('vocalToMix')) {
+            file1 = vocalBlob;
+            file2 = instrBlob;
+        }
         if (file1 && file2) {
             const formData = new FormData();
             formData.append('audio1', file1);
             formData.append('audio2', file2);
             formData.append('balance', balance.value);
+            showProgress(10);
             const response = await fetch(`${SERVER_URL}/mix`, {
                 method: 'POST',
                 body: formData
             });
+            showProgress(50);
             mixBlob = await response.blob();
+            showProgress(100);
             document.getElementById('mixPreview').src = URL.createObjectURL(mixBlob);
             document.getElementById('result').style.display = 'block';
+            setTimeout(() => document.getElementById('progressBar').style.display = 'none', 500);
+            if (localStorage.getItem('vocalToMix')) {
+                localStorage.removeItem('vocalToMix');
+                localStorage.removeItem('instrToMix');
+            }
         }
-    }
+    });
 }
 
 function playMixPreview() {
@@ -134,20 +161,25 @@ function downloadMix() {
 
 // Конвертация аудио
 if (document.getElementById('formatSelect')) {
-    document.getElementById('audioInput').addEventListener('change', async function(e) {
-        const file = e.target.files[0];
+    document.getElementById('audioInput').addEventListener('change', enableProcessButton);
+    document.getElementById('processButton').addEventListener('click', async () => {
+        const file = document.getElementById('audioInput').files[0];
         const format = document.getElementById('formatSelect').value;
         if (file) {
             const formData = new FormData();
             formData.append('audio', file);
             formData.append('format', format);
+            showProgress(10);
             const response = await fetch(`${SERVER_URL}/convert`, {
                 method: 'POST',
                 body: formData
             });
+            showProgress(50);
             convertedBlob = await response.blob();
+            showProgress(100);
             document.getElementById('convertedPreview').src = URL.createObjectURL(convertedBlob);
             document.getElementById('result').style.display = 'block';
+            setTimeout(() => document.getElementById('progressBar').style.display = 'none', 500);
         }
     });
 }
@@ -176,17 +208,12 @@ if (document.getElementById('speedSlider')) {
     if (localStorage.getItem('vocalToEdit')) {
         input.disabled = true;
         document.getElementById('saveVocalBtn').style.display = 'inline-block';
-        updateEdit(localStorage.getItem('vocalToEdit'));
-        localStorage.removeItem('vocalToEdit');
+        document.getElementById('processButton').disabled = false;
     }
 
-    input.addEventListener('change', () => updateEdit(input.files[0]));
-    document.querySelectorAll('.slider, .small-input').forEach(el => el.addEventListener('input', () => {
-        if (input.files[0]) updateEdit(input.files[0]);
-    }));
-
-    async function updateEdit(fileOrUrl) {
-        const file = typeof fileOrUrl === 'string' ? await fetch(fileOrUrl).then(res => res.blob()) : fileOrUrl;
+    input.addEventListener('change', enableProcessButton);
+    document.getElementById('processButton').addEventListener('click', async () => {
+        const file = localStorage.getItem('vocalToEdit') ? await fetch(localStorage.getItem('vocalToEdit')).then(res => res.blob()) : input.files[0];
         if (file) {
             const formData = new FormData();
             formData.append('audio', file);
@@ -196,15 +223,22 @@ if (document.getElementById('speedSlider')) {
             formData.append('reverb', document.getElementById('reverbInput').value);
             formData.append('flanger', document.getElementById('flangerInput').value);
             formData.append('volume', document.getElementById('volumeInput').value);
+            showProgress(10);
             const response = await fetch(`${SERVER_URL}/edit`, {
                 method: 'POST',
                 body: formData
             });
+            showProgress(50);
             editedBlob = await response.blob();
+            showProgress(100);
             document.getElementById('editedPreview').src = URL.createObjectURL(editedBlob);
             document.getElementById('result').style.display = 'block';
+            setTimeout(() => document.getElementById('progressBar').style.display = 'none', 500);
+            if (localStorage.getItem('vocalToEdit')) {
+                localStorage.removeItem('vocalToEdit');
+            }
         }
-    }
+    });
 }
 
 function playEditedPreview() {
