@@ -1,5 +1,5 @@
 // URL сервера на Glitch
-const SERVER_URL = 'https://carnelian-hungry-silver.glitch.me/';
+const SERVER_URL = 'https://d699b6f2-1143-4e86-a434-0a3d0803b2af-00-bln4qkwkaxad.kirk.replit.dev';
 
 // Глобальные переменные
 let vocalBlob, instrBlob, mixBlob, convertedBlob, editedBlob;
