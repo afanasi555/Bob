@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конвертация аудио</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Конвертация аудио</h1>
+        <input type="file" id="audioInput" accept="audio/*" class="file-input">
+        <select id="formatSelect" class="select">
+            <option value="mp3">MP3</option>
+            <option value="wav">WAV</option>
+            <option value="ogg">OGG</option>
+            <option value="flac">FLAC</option>
+        </select>
+        <div id="result" class="result">
+            <audio id="convertedPreview" controls></audio>
+            <button onclick="playConvertedPreview()">Проиграть</button>
+            <button onclick="downloadConverted()">Скачать</button>
+        </div>
+        <a href="index.html" class="back-button">Назад</a>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
