@@ -8,36 +8,17 @@ local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local NetworkClient = game:GetService("NetworkClient")
-local DataStoreService = game:GetService("DataStoreService")
-local ConfigStore = DataStoreService:GetDataStore("VibeXConfig")
 
--- Конфигурация
-local config = {
-    noClip = false,
-    antiHindrance = false
-}
-
--- Загрузка конфига
-local function loadConfig()
-    local success, savedConfig = pcall(function()
-        return ConfigStore:GetAsync(LocalPlayer.UserId .. "_VibeX")
-    end)
-    if success and savedConfig then
-        config = savedConfig
-    end
-    print("Конфиг загружен:", config.noClip, config.antiHindrance)
-end
-
--- Сохранение конфига
-local function saveConfig()
-    pcall(function()
-        ConfigStore:SetAsync(LocalPlayer.UserId .. "_VibeX", config)
-    end)
-    print("Конфиг сохранен")
-end
+-- Глобальные переменные
+local NewFunctions = {}
+NewFunctions.noClipConnection = nil
+NewFunctions.antiHindranceConnection = nil
+local noClipActive = false
+local antiHindranceActive = false
 
 -- Безопасный вызов Remote
 local function mockRemoteCall(remote, ...)
+    print("Попытка Remote вызова:", remote.Name)
     local methods = {
         function() -- Метод 1: Прямой вызов
             if remote:IsA("RemoteEvent") then
@@ -48,7 +29,7 @@ local function mockRemoteCall(remote, ...)
         end,
         function() -- Метод 2: Обфускация через временный Instance
             local temp = Instance.new("Folder")
-            temp.Parent = game
+            temp.Parent = Workspace
             local success, result = pcall(function()
                 if remote:IsA("RemoteEvent") then
                     remote:FireServer(...)
@@ -79,7 +60,7 @@ local function mockRemoteCall(remote, ...)
             return result
         end
         print("Remote вызов не удался, метод:", i)
-        wait(0.1)
+        wait(0.05)
     end
     print("Все методы Remote вызова провалились")
     return nil
@@ -89,16 +70,15 @@ end
 local function noClip(active)
     local character = LocalPlayer.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then
-        print("Персонаж или HumanoidRootPart не найдены")
+        print("Ошибка No Clip: Персонаж или HumanoidRootPart не найдены")
         return
     end
-    local Clipon = false
     local lastPosition = character.HumanoidRootPart.CFrame
     if active then
-        Clipon = true
+        noClipActive = true
         if not NewFunctions.noClipConnection then
             NewFunctions.noClipConnection = RunService.Stepped:Connect(function()
-                if not Clipon or not character or not character:FindFirstChild("Humanoid") or not character:FindFirstChild("HumanoidRootPart") then
+                if not noClipActive or not character or not character:FindFirstChild("Humanoid") or not character:FindFirstChild("HumanoidRootPart") then
                     if NewFunctions.noClipConnection then
                         NewFunctions.noClipConnection:Disconnect()
                         NewFunctions.noClipConnection = nil
@@ -132,7 +112,7 @@ local function noClip(active)
                         break
                     end
                     print("No Clip не удался, метод:", i)
-                    wait(0.1)
+                    wait(0.05)
                 end
                 local currentPosition = character.HumanoidRootPart.CFrame
                 local distanceMoved = (currentPosition.Position - lastPosition.Position).Magnitude
@@ -144,7 +124,7 @@ local function noClip(active)
             end)
         end
     else
-        Clipon = false
+        noClipActive = false
         if NewFunctions.noClipConnection then
             NewFunctions.noClipConnection:Disconnect()
             NewFunctions.noClipConnection = nil
@@ -159,88 +139,90 @@ local function noClip(active)
 end
 
 -- Teleport to My Base
-local function teleportToBase(active)
-    if active then
-        local myBase = Workspace:FindFirstChild(LocalPlayer.Name .. "Base")
-        if not myBase or not myBase:FindFirstChild("HumanoidRootPart") then
-            print("База не найдена:", LocalPlayer.Name .. "Base")
-            return
+local function teleportToBase()
+    local myBase = Workspace:FindFirstChild(LocalPlayer.Name .. "Base")
+    if not myBase or not myBase:FindFirstChild("HumanoidRootPart") then
+        print("Ошибка телепорта: База не найдена:", LocalPlayer.Name .. "Base")
+        return
+    end
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
+        print("Ошибка телепорта: Персонаж или HumanoidRootPart не найдены")
+        return
+    end
+    local methods = {
+        function() -- Метод 1: Прямой телепорт
+            character.HumanoidRootPart.CFrame = myBase.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
+        end,
+        function() -- Метод 2: Использование Remote
+            mockRemoteCall(ReplicatedStorage:FindFirstChild("TeleportEvent") or Instance.new("RemoteEvent"), myBase.HumanoidRootPart.Position)
+        end,
+        function() -- Метод 3: Манипуляция физикой
+            character.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
+            character.HumanoidRootPart.CFrame = CFrame.new(myBase.HumanoidRootPart.Position + Vector3.new(0, 5, 0))
         end
-        local character = LocalPlayer.Character
-        if not character or not character:FindFirstChild("HumanoidRootPart") then
-            print("Персонаж или HumanoidRootPart не найдены")
-            return
+    }
+    for i, method in ipairs(methods) do
+        local success = pcall(method)
+        if success then
+            print("Телепорт на базу успешен, метод:", i)
+            break
         end
-        local methods = {
-            function() -- Метод 1: Прямой телепорт
-                character.HumanoidRootPart.CFrame = myBase.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
-            end,
-            function() -- Метод 2: Использование Remote
-                mockRemoteCall(ReplicatedStorage.TeleportEvent, myBase.HumanoidRootPart.Position)
-            end,
-            function() -- Метод 3: Манипуляция физикой
-                character.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
-                character.HumanoidRootPart.CFrame = CFrame.new(myBase.HumanoidRootPart.Position + Vector3.new(0, 5, 0))
-            end
-        }
-        for i, method in ipairs(methods) do
-            local success = pcall(method)
-            if success then
-                print("Телепорт на базу успешен, метод:", i)
-                break
-            end
-            print("Телепорт на базу не удался, метод:", i)
-            wait(0.1)
-        end
+        print("Телепорт на базу не удался, метод:", i)
+        wait(0.05)
     end
 end
 
 -- Anti-Hindrance
 local function antiHindrance(active)
     if active then
-        NewFunctions.antiHindranceConnection = RunService.Stepped:Connect(function()
-            local character = LocalPlayer.Character
-            if character and character:FindFirstChild("Humanoid") then
-                local humanoid = character.Humanoid
-                local methods = {
-                    function() -- Метод 1: Отключение анимаций и эффектов
-                        humanoid.Sit = false
-                        humanoid.PlatformStand = false
-                        for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-                            if track.Name:lower():find("dance") or track.Name:lower():find("boogie") then
-                                track:Stop()
+        antiHindranceActive = true
+        if not NewFunctions.antiHindranceConnection then
+            NewFunctions.antiHindranceConnection = RunService.Stepped:Connect(function()
+                local character = LocalPlayer.Character
+                if character and character:FindFirstChild("Humanoid") then
+                    local humanoid = character.Humanoid
+                    local methods = {
+                        function() -- Метод 1: Отключение анимаций и эффектов
+                            humanoid.Sit = false
+                            humanoid.PlatformStand = false
+                            for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+                                if track.Name:lower():find("dance") or track.Name:lower():find("boogie") then
+                                    track:Stop()
+                                end
                             end
-                        end
-                        for _, effect in pairs(Lighting:GetChildren()) do
-                            if effect:IsA("PostEffect") or effect.Name:lower():find("bee") or effect.Name:lower():find("medusa") then
-                                effect.Enabled = false
+                            for _, effect in pairs(Lighting:GetChildren()) do
+                                if effect:IsA("PostEffect") or effect.Name:lower():find("bee") or effect.Name:lower():find("medusa") then
+                                    effect.Enabled = false
+                                end
                             end
+                        end,
+                        function() -- Метод 2: Сброс состояния
+                            humanoid:ChangeState(Enum.HumanoidStateType.Running)
+                            humanoid.WalkSpeed = math.max(humanoid.WalkSpeed, 16)
+                            humanoid.JumpPower = math.max(humanoid.JumpPower, 50)
                         end
-                    end,
-                    function() -- Метод 2: Сброс состояния
-                        humanoid:ChangeState(Enum.HumanoidStateType.Running)
-                        humanoid.WalkSpeed = math.max(humanoid.WalkSpeed, 16)
-                        humanoid.JumpPower = math.max(humanoid.JumpPower, 50)
+                    }
+                    for i, method in ipairs(methods) do
+                        local success = pcall(method)
+                        if success then
+                            print("Anti-Hindrance активен, метод:", i)
+                            break
+                        end
+                        print("Anti-Hindrance не удался, метод:", i)
+                        wait(0.05)
                     end
-                }
-                for i, method in ipairs(methods) do
-                    local success = pcall(method)
-                    if success then
-                        print("Anti-Hindrance активен, метод:", i)
-                        break
+                    if humanoid.MoveDirection ~= Vector3.new(0, 0, 0) then
+                        local intendedDirection = humanoid.MoveDirection
+                        character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(intendedDirection * 0.1)
                     end
-                    print("Anti-Hindrance не удался, метод:", i)
-                    wait(0.1)
+                else
+                    print("Ошибка Anti-Hindrance: Персонаж или Humanoid не найдены")
                 end
-                if humanoid.MoveDirection ~= Vector3.new(0, 0, 0) then
-                    local intendedDirection = humanoid.MoveDirection
-                    character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(intendedDirection * 0.1)
-                end
-            else
-                print("Персонаж или Humanoid не найдены")
-            end
-        end)
+            end)
+        end
     else
+        antiHindranceActive = false
         if NewFunctions.antiHindranceConnection then
             NewFunctions.antiHindranceConnection:Disconnect()
             NewFunctions.antiHindranceConnection = nil
@@ -249,26 +231,34 @@ local function antiHindrance(active)
     end
 end
 
--- Инициализация функций
-local NewFunctions = {}
-NewFunctions.noClipConnection = nil
-NewFunctions.antiHindranceConnection = nil
-
 -- Создание сенсорного интерфейса
 local function initGUI()
+    print("Попытка создания GUI")
+    local parent = game.CoreGui
+    local success, guiParent = pcall(function()
+        return LocalPlayer:WaitForChild("PlayerGui", 5)
+    end)
+    if success and guiParent then
+        parent = guiParent
+        print("GUI будет создан в PlayerGui")
+    else
+        print("PlayerGui не найден, создание в CoreGui")
+    end
+
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "VibeXCheatMobile"
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5) or game.CoreGui
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.DisplayOrder = 1000
+    ScreenGui.Parent = parent
+    print("ScreenGui создан:", ScreenGui.Name)
 
     local function createButton(name, position, toggle, func)
         local Button = Instance.new("TextButton")
         Button.Size = UDim2.new(0, 100, 0, 40)
         Button.Position = position
-        Button.BackgroundColor3 = toggle and (config[name] and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(60, 60, 60)) or Color3.fromRGB(60, 60, 60)
-        Button.TextColor3 = toggle and (config[name] and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)) or Color3.fromRGB(255, 255, 255)
+        Button.BackgroundColor3 = toggle and (name == "No Clip" and noClipActive or antiHindranceActive) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(60, 60, 60)
+        Button.TextColor3 = toggle and (name == "No Clip" and noClipActive or antiHindranceActive) and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
         Button.Text = name
         Button.Font = Enum.Font.SourceSansBold
         Button.TextSize = 16
@@ -278,36 +268,56 @@ local function initGUI()
         UICorner.Parent = Button
         Button.MouseButton1Click:Connect(function()
             if toggle then
-                config[name] = not config[name]
-                Button.BackgroundColor3 = config[name] and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(60, 60, 60)
-                Button.TextColor3 = config[name] and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
-                func(config[name])
-                saveConfig()
-                print(name .. ":", config[name])
+                if name == "No Clip" then
+                    noClipActive = not noClipActive
+                    func(noClipActive)
+                    Button.BackgroundColor3 = noClipActive and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(60, 60, 60)
+                    Button.TextColor3 = noClipActive and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
+                    print("No Clip:", noClipActive)
+                elseif name == "Anti-Hindrance" then
+                    antiHindranceActive = not antiHindranceActive
+                    func(antiHindranceActive)
+                    Button.BackgroundColor3 = antiHindranceActive and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(60, 60, 60)
+                    Button.TextColor3 = antiHindranceActive and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
+                    print("Anti-Hindrance:", antiHindranceActive)
+                end
             else
                 Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
                 Button.TextColor3 = Color3.fromRGB(0, 0, 0)
-                func(true)
+                func()
                 wait(0.5)
                 Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
                 Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+                print("Teleport выполнен")
             end
         end)
+        print("Кнопка создана:", name)
     end
 
-    createButton("noClip", UDim2.new(0, 10, 0, 10), true, noClip)
+    createButton("No Clip", UDim2.new(0, 10, 0, 10), true, noClip)
     createButton("Teleport", UDim2.new(0, 10, 0, 60), false, teleportToBase)
-    createButton("antiHindrance", UDim2.new(0, 10, 0, 110), true, antiHindrance)
+    createButton("Anti-Hindrance", UDim2.new(0, 10, 0, 110), true, antiHindrance)
 end
 
--- Инициализация
-local success, errorMsg = pcall(function()
-    loadConfig()
-    initGUI()
-    noClip(config.noClip)
-    antiHindrance(config.antiHindrance)
-    print("VibeX Cheat Mobile успешно загружен")
-end)
-if not success then
-    print("Ошибка загрузки VibeX Cheat Mobile: " .. tostring(errorMsg))
+-- Инициализация с проверкой загрузки
+local function init()
+    print("Запуск VibeX Cheat Mobile")
+    if not LocalPlayer then
+        print("Ошибка: LocalPlayer не найден")
+        return
+    end
+    print("LocalPlayer найден:", LocalPlayer.Name)
+    local success, errorMsg = pcall(function()
+        LocalPlayer:WaitForChild("Character", 5)
+        Workspace:WaitForChild(LocalPlayer.Name .. "Base", 5)
+        initGUI()
+        print("VibeX Cheat Mobile успешно загружен")
+    end)
+    if not success then
+        print("Ошибка загрузки VibeX Cheat Mobile: " .. tostring(errorMsg))
+    end
 end
+
+-- Запуск с задержкой для полной загрузки
+wait(2) -- Ждем 2 секунды для загрузки игры
+init()
