@@ -1,87 +1,40 @@
--- VibeX Cheat Menu для Steal a Brainrot (No-Clip и Teleport, PC/Mobile)
+-- VibeX Cheat Menu with No-Clip and Teleport Functions
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local PathfindingService = game:GetService("PathfindingService")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
-local PhysicsService = game:GetService("PhysicsService")
 
--- Mock Remote Calls для обхода античита
-local function mockRemoteCall(remote, ...)
-    local success, result = pcall(function()
-        if remote:IsA("RemoteEvent") then
-            remote:FireServer(...)
-        elseif remote:IsA("RemoteFunction") then
-            return remote:InvokeServer(...)
-        end
-    end)
-    return success and result or nil
+-- Scaling and Border Thickness
+local scalingStrength = 1
+local borderThickness = 10
+
+-- Remove Existing GUI
+local function clearExistingGUI()
+    local existingGui = LocalPlayer.PlayerGui:FindFirstChild("VibeXCheatMenu")
+    if existingGui then
+        existingGui:Destroy()
+    end
 end
 
--- Настройка CollisionGroup для No-Clip
-local function setupCollisionGroup()
-    pcall(function()
-        PhysicsService:CreateCollisionGroup("NoClip")
-        PhysicsService:CollisionGroupSetCollidable("NoClip", "Default", false)
-    end)
-end
-setupCollisionGroup()
-
--- Основные функции
+-- Cheat Functions
 local Functions = {}
 
--- No-Clip (несколько методов)
 Functions.noClip = function(active)
     local character = LocalPlayer.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then return end
     local Clipon = false
-    local lastPosition = character.HumanoidRootPart.CFrame
-    local methods = {
-        function() -- Метод 1: Отключение CanCollide
-            for _, v in pairs(character:GetChildren()) do
-                if v:IsA("BasePart") then
-                    v.CanCollide = false
-                end
-            end
-        end,
-        function() -- Метод 2: CollisionGroup
-            for _, v in pairs(character:GetChildren()) do
-                if v:IsA("BasePart") then
-                    pcall(function()
-                        PhysicsService:SetPartCollisionGroup(v, "NoClip")
-                    end)
-                end
-            end
-        end,
-        function() -- Метод 3: BodyVelocity для игнорирования коллизий
-            local bodyVelocity = Instance.new("BodyVelocity")
-            bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
-            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-            bodyVelocity.Parent = character.HumanoidRootPart
-        end
-    }
-
     if active then
         Clipon = true
         Functions.noClipConnection = RunService.Stepped:Connect(function()
             if Clipon and character and character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart") then
-                for i, method in ipairs(methods) do
-                    local success, _ = pcall(method)
-                    if success then break end
-                    if i == #methods then
-                        print("Все методы No-Clip заблокированы античитом")
+                for _, v in pairs(character:GetChildren()) do
+                    if v:IsA("BasePart") then
+                        v.CanCollide = false
                     end
                 end
-                local currentPosition = character.HumanoidRootPart.CFrame
-                local distanceMoved = (currentPosition.Position - lastPosition.Position).Magnitude
-                if distanceMoved > 3 and not UserInputService:IsKeyDown(Enum.KeyCode.W) and not UserInputService:IsKeyDown(Enum.KeyCode.S) and not UserInputService:IsKeyDown(Enum.KeyCode.A) and not UserInputService:IsKeyDown(Enum.KeyCode.D) then
-                    character.HumanoidRootPart.CFrame = lastPosition
-                end
-                lastPosition = currentPosition
             else
                 if Functions.noClipConnection then
                     Functions.noClipConnection:Disconnect()
@@ -97,97 +50,60 @@ Functions.noClip = function(active)
             for _, v in pairs(character:GetChildren()) do
                 if v:IsA("BasePart") then
                     v.CanCollide = true
-                    pcall(function()
-                        PhysicsService:SetPartCollisionGroup(v, "Default")
-                    end)
-                    local bodyVelocity = v:FindFirstChildOfClass("BodyVelocity")
-                    if bodyVelocity then
-                        bodyVelocity:Destroy()
-                    end
                 end
             end
         end
     end
 end
 
--- Teleport (на свою или вражескую базу, несколько методов)
-Functions.teleport = function(active)
-    if not active then
-        if Functions.teleportConnection then
-            Functions.teleportConnection:Disconnect()
-            Functions.teleportConnection = nil
-        end
-        return
-    end
-
-    local function teleportToBase(base)
-        local character = LocalPlayer.Character
-        if not character or not character:FindFirstChild("HumanoidRootPart") or not base or not base:IsA("Model") then return false end
-        local targetPos = base:FindFirstChild("HumanoidRootPart") and base.HumanoidRootPart.Position or base:GetModelCFrame().Position
-        local methods = {
-            function() -- Метод 1: Прямая смена CFrame
-                character.HumanoidRootPart.CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 0))
-                return true
-            end,
-            function() -- Метод 2: PathfindingService
-                local path = PathfindingService:CreatePath()
-                local success, _ = pcall(function()
-                    path:ComputeAsync(character.HumanoidRootPart.Position, targetPos)
-                end)
-                if success and path.Status == Enum.PathStatus.Success then
-                    local waypoints = path:GetWaypoints()
-                    for _, waypoint in ipairs(waypoints) do
-                        character.Humanoid:MoveTo(waypoint.Position)
-                        character.Humanoid.MoveToFinished:Wait()
-                    end
-                    return true
-                end
-                return false
-            end,
-            function() -- Метод 3: BodyVelocity
-                local bodyVelocity = Instance.new("BodyVelocity")
-                bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                bodyVelocity.Velocity = (targetPos - character.HumanoidRootPart.Position).Unit * 50
-                bodyVelocity.Parent = character.HumanoidRootPart
-                wait(1)
-                bodyVelocity:Destroy()
-                return true
-            end
-        }
-
-        for i, method in ipairs(methods) do
-            local success = pcall(method)
-            if success then return true end
-            if i == #methods then
-                print("Все методы телепортации заблокированы античитом")
-                return false
-            end
-        end
-    end
-
-    Functions.teleportConnection = RunService.Stepped:Connect(function()
-        local myBase = Workspace:FindFirstChild(LocalPlayer.Name .. "Base")
-        local enemyBases = {}
-        for _, base in pairs(Workspace:GetChildren()) do
-            if base.Name:match("Base$") and base.Name ~= LocalPlayer.Name .. "Base" then
-                table.insert(enemyBases, base)
-            end
-        end
-        if myBase and teleportToBase(myBase) then
-            -- Телепорт на свою базу успешен
-        else
-            for _, enemyBase in ipairs(enemyBases) do
-                if enemyBase:FindFirstChildOfClass("Model") then
-                    teleportToBase(enemyBase)
-                    break
+Functions.autoTeleportWhenSteal = function(active)
+    if active then
+        Functions.autoTeleportStealConnection = RunService.Stepped:Connect(function()
+            local brainrot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Brainrot")
+            if brainrot then
+                local base = Workspace:FindFirstChild(LocalPlayer.Name .. "Base")
+                if base and base:FindFirstChild("HumanoidRootPart") then
+                    LocalPlayer.Character.HumanoidRootPart.CFrame = base.HumanoidRootPart.CFrame
                 end
             end
+        end)
+    else
+        if Functions.autoTeleportStealConnection then
+            Functions.autoTeleportStealConnection:Disconnect()
+            Functions.autoTeleportStealConnection = nil
         end
-    end)
+    end
 end
 
--- GUI
+Functions.autoTeleportEnemyBase = function(active)
+    if active then
+        Functions.autoTeleportEnemyBaseConnection = RunService.Stepped:Connect(function()
+            local myBase = Workspace:FindFirstChild(LocalPlayer.Name .. "Base")
+            if myBase and myBase:FindFirstChild("Timer") and myBase.Timer.Value < 20 then return end
+            for _, base in pairs(Workspace:GetChildren()) do
+                if base.Name:match("Base$") and base.Name ~= LocalPlayer.Name .. "Base" then
+                    if base:FindFirstChild("Timer") and base.Timer.Value <= 10 and base.Timer.Value > 0 then
+                        local brainrot = base:FindFirstChildOfClass("Model")
+                        if brainrot and not brainrot:FindFirstChild("StolenTag") then
+                            LocalPlayer.Character.HumanoidRootPart.CFrame = base.HumanoidRootPart.CFrame
+                            break
+                        end
+                    end
+                end
+            end
+        end)
+    else
+        if Functions.autoTeleportEnemyBaseConnection then
+            Functions.autoTeleportEnemyBaseConnection:Disconnect()
+            Functions.autoTeleportEnemyBaseConnection = nil
+        end
+    end
+end
+
+-- Main GUI Creation
 local function initGUI()
+    clearExistingGUI()
+
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "VibeXCheatMenu"
     ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5) or game.CoreGui
@@ -195,9 +111,7 @@ local function initGUI()
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.DisplayOrder = 1000
 
-    local scalingStrength = 1
-    local borderThickness = 10
-
+    -- Icon (Yellow Flower on Blue Background)
     local IconButton = Instance.new("TextButton")
     IconButton.Name = "VibeIcon"
     IconButton.Size = UDim2.new(0, 40, 0, 40)
@@ -209,6 +123,7 @@ local function initGUI()
     IconCorner.CornerRadius = UDim.new(0, 10)
     IconCorner.Parent = IconButton
 
+    -- Flower (5 petals + center)
     local function createPetal(size, position)
         local Petal = Instance.new("Frame")
         Petal.Size = size
@@ -220,12 +135,13 @@ local function initGUI()
         PetalCorner.CornerRadius = UDim.new(0, 5)
         PetalCorner.Parent = Petal
     end
-    createPetal(UDim2.new(0, 10, 0, 10), UDim2.new(0.5, -5, 0, 5))
-    createPetal(UDim2.new(0, 10, 0, 10), UDim2.new(0.5, -5, 1, -15))
-    createPetal(UDim2.new(0, 10, 0, 10), UDim2.new(0, 5, 0.5, -5))
-    createPetal(UDim2.new(0, 10, 0, 10), UDim2.new(1, -15, 0.5, -5))
-    createPetal(UDim2.new(0, 10, 0, 10), UDim2.new(0.5, -5, 0.5, -5))
+    createPetal(UDim2.new(0, 10, 0, 10), UDim2.new(0.5, -5, 0, 5)) -- Top
+    createPetal(UDim2.new(0, 10, 0, 10), UDim2.new(0.5, -5, 1, -15)) -- Bottom
+    createPetal(UDim2.new(0, 10, 0, 10), UDim2.new(0, 5, 0.5, -5)) -- Left
+    createPetal(UDim2.new(0, 10, 0, 10), UDim2.new(1, -15, 0.5, -5)) -- Right
+    createPetal(UDim2.new(0, 10, 0, 10), UDim2.new(0.5, -5, 0.5, -5)) -- Center
 
+    -- Draggable Icon
     local draggingIcon, dragStartIcon, startPosIcon
     IconButton.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -252,6 +168,7 @@ local function initGUI()
         end
     end)
 
+    -- Main Frame (VibeX, Centered)
     local Camera = game.Workspace.CurrentCamera
     local screenSize = Camera.ViewportSize
     local menuWidth, menuHeight = 300, 250
@@ -268,6 +185,7 @@ local function initGUI()
     UICorner.CornerRadius = UDim.new(0, 8)
     UICorner.Parent = MainFrame
 
+    -- Resize Borders
     local bordersActive = false
     local function createBorder(name, size, position, cursor)
         local Border = Instance.new("Frame")
@@ -398,6 +316,7 @@ local function initGUI()
     UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     UIListLayout.Parent = ScrollFrame
 
+    -- Minimize Button
     local MinimizeButton = Instance.new("TextButton")
     MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
     MinimizeButton.Position = UDim2.new(1, -35, 0, 5)
@@ -414,6 +333,75 @@ local function initGUI()
         MainFrame.Visible = false
     end)
 
+    -- Draggable Menu
     local dragging, dragStart, startPos
     TitleLabel.InputBegan:Connect(function(input)
-        if input.UserInputTyp
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    TitleLabel.InputChanged:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
+            local delta = input.Position - dragStart
+            local newX = startPos.X.Offset + delta.X
+            local newY = startPos.Y.Offset + delta.Y
+            if newX < 0 then newX = 0 end
+            if newY < 0 then newY = 0 end
+            if newX + MainFrame.Size.X.Offset > screenSize.X then newX = screenSize.X - MainFrame.Size.X.Offset end
+            if newY + MainFrame.Size.Y.Offset > screenSize.Y then newY = screenSize.Y - MainFrame.Size.Y.Offset end
+            MainFrame.Position = UDim2.new(0, newX, 0, newY)
+        end
+    end)
+
+    -- Button Creation Function
+    local function createButton(parent, name, isSubButton)
+        local Button = Instance.new("TextButton")
+        Button.Size = UDim2.new(1, -10, 0, 40)
+        Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Button.Text = isSubButton and name or name .. " ◀️"
+        Button.Font = Enum.Font.SourceSans
+        Button.TextSize = 18
+        Button.BorderSizePixel = 0
+        Button.Parent = parent
+        local UICorner = Instance.new("UICorner")
+        UICorner.CornerRadius = UDim.new(0, 6)
+        UICorner.Parent = Button
+        return Button
+    end
+
+    -- Cheat Buttons
+    local CheatButton1 = createButton(ScrollFrame, "No-Clip", true)
+    local CheatButton2 = createButton(ScrollFrame, "Teleport to Own Base", true)
+    local CheatButton3 = createButton(ScrollFrame, "Teleport to Enemy Base", true)
+
+    local noClipActive = false
+    CheatButton1.MouseButton1Click:Connect(function()
+        noClipActive = not noClipActive
+        CheatButton1.Text = "No-Clip " .. (noClipActive and "✅" or "❌")
+        CheatButton1.BackgroundColor3 = noClipActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(60, 60, 60)
+        CheatButton1.TextColor3 = noClipActive and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
+        Functions.noClip(noClipActive)
+    end)
+
+    local teleportOwnBaseActive = false
+    CheatButton2.MouseButton1Click:Connect(function()
+        teleportOwnBaseActive = not teleportOwnBaseActive
+        CheatButton2.Text = "Teleport to Own Base " .. (teleportOwnBaseActive and "✅" or "❌")
+        CheatButton2.BackgroundColor3 = teleportOwnBaseActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(60, 60, 60)
+        CheatButton2.TextColor3 = teleportOwnBaseActive and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
+        Functions.autoTeleportWhenSteal(teleportOwnBaseActive)
+    end)
+
+    local teleportEnemyBaseActive = false
+    CheatButton3.MouseButton1Click:Connect(function()
+        teleportEnemyBaseActive = not teleportEnemyBaseActive
+        CheatButton3.Text = "Teleport to Enemy Base " .. (teleportEnemyBaseActive and "✅" or "❌")
+        CheatButton3.BackgroundColor3 = teleportEnemyBaseActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(60,
